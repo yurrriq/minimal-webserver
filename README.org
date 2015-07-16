@@ -7,14 +7,14 @@ Easy! just clone this repo...
 git clone https://github.com/yurrriq/minimal-webserver.git
 #+END_SRC
 
-... and make =ws.lfescript= available on your =$PATH=,
+... and make =ws.lfesh= available on your =$PATH=,
 or create an alias in your profile:
 
 #+BEGIN_SRC sh
-alias ws="path/to/minimal-webserver/ws.lfescript"
+alias ws="path/to/minimal-webserver/ws.lfesh"
 #+END_SRC
 
 ** Usage
 #+BEGIN_SRC sh
-ws.lfescript 8000 .
+ws.lfesh 8000 .
 #+END_SRC
