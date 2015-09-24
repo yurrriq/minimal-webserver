@@ -2,7 +2,7 @@
 ;; -*- lfe -*-
 
 (defun main
-  ([(list string path)]
+  ([`(,string ,path)]
     (try
       (let ((port (list_to_integer string))
              (name (++ "ws" string)))
