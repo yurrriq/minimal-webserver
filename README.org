@@ -21,3 +21,8 @@ alias ws="/path/to/minimal-webserver/ws.lfe"
 #+BEGIN_SRC sh
 ws 8000 .
 #+END_SRC
+
+** License
+[[file:UNLICENSE][The Unlicense]]
+
+This is free and unencumbered software released into the public domain.
