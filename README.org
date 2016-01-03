@@ -1,15 +1,18 @@
 * minimal-webserver
 Have +Erlang+ [[http://lfe.io][LFE]] on your system and want to serve static files for testing?
 
-Easy! just clone this repo...
-
+Easy! just clone this repo:
 #+BEGIN_SRC sh
 git clone https://github.com/yurrriq/minimal-webserver.git
 #+END_SRC
 
+... make =ws.lfe= executable:
+#+BEGIN_SRC sh
+chmod 755 ws.lfe
+#+END_SRC
+
 ... and make =ws.lfe= available on your =$PATH=,
 or create an alias in your profile:
-
 #+BEGIN_SRC sh
 alias ws="/path/to/minimal-webserver/ws.lfe"
 #+END_SRC

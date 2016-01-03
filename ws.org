@@ -1,0 +1,174 @@
+* Minimal LFE Web Server
+  :PROPERTIES:
+  :noweb:    tangle
+  :END:
+The general structure of [[file:ws.lfe][ws.lfe]] is as follows:
+#+BEGIN_SRC lfe :tangle ws.lfe
+<<shebang>>
+
+<<main/1>>
+
+<<usage/0>>
+
+<<serve/3>>
+
+<<fix-code-path/0>>
+
+<<script-args-case-analysis>>
+#+END_SRC
+
+** shebang
+At the top of every ~lfe~ script must be the following shebang.
+#+NAME: shebang
+#+BEGIN_SRC lfe
+#!/usr/bin/env lfe
+;; -*- lfe -*-
+#+END_SRC
+The second line tells Emacs to use ~lfe-mode~.
+
+When running an ~lfe~ script, the lfe shell variable ~script-name~ is bound to
+the script file name and ~script-args~ to the script arguments.
+
+For example, let ~example.lfe~ contain:
+#+NAME: example.lfe
+#+BEGIN_SRC lfe
+#!/usr/bin/env lfe
+;; -*- lfe -*-
+
+(lfe_io:fwrite "script-name: ~p\nscript-args: ~p\n"
+               `[,script-name ,script-args])
+#+END_SRC
+
+If we execute it with the arguments ~testing~ and ~123~, ~script-name~ is bound
+to ~​"example.lfe"​~ and ~script-args~ is bound to the list, ~("testing" "123")~.
+#+NAME: testing-123
+#+BEGIN_SRC sh
+lfe example.lfe testing 123
+#+END_SRC
+#+NAME: results-testing-123
+#+BEGIN_EXAMPLE
+script-name: "example.lfe"
+script-args: ("testing" "123")
+#+END_EXAMPLE
+
+** Fix code path and call ~main/1~
+When running an ~lfe~ script this way, all top-level forms are evaluated, thus
+we need a top-level form to handle ~script-args~ and perform the desired action.
+
+In this case, call ~fix-code-path/0~ and pass ~script-args~ to ~main/1~.
+#+NAME: script-args-case-analysis
+#+BEGIN_SRC lfe
+(progn
+  (fix-code-path)
+  (main script-args))
+#+END_SRC
+
+** ~fix-code-path/0~
+Stolen from [[https://github.com/rvirding/lfe/blob/develop/bin/lfec][lfe/bin/lfec]], ~fix-code-path/0~ removes ~​"."​~ from the code path.
+#+NAME: fix-code-path/0
+#+BEGIN_SRC lfe
+;; https://github.com/rvirding/lfe/blob/develop/bin/lfec
+(defun fix-code-path ()
+  (let* ((p0 (code:get_path))
+         (p1 (lists:delete "." p0)))
+    (code:set_path p1)))
+#+END_SRC
+
+** ~main/1~
+~main/1~ is where all the magic happens. If given anything other than a list of
+two elements, ~port-string~ and ~path~, or the empty list, return
+~(usage)~.
+
+~port-string~ is a string representation of a port on which to listen and ~path~
+is a path to a directory to serve.
+
+Convert ~port-string~ to an integer, ~port~, using ~list_to_integer/1~, then
+call ~serve/3~ with ~(++ "ws" port-string)~ as the name, ~port~ as the port and
+~path~ as the path. Wrap the aforementioned logic in a ~try/catch~ and return
+~(usage)~, should anything go wrong.
+
+If no arguments are given, i.e. the empty list, the default ~port~ is ~8000~ and
+the default ~path~ is ~​"."​~.
+#+NAME: main/1
+#+BEGIN_SRC lfe
+(defun main
+  ([`(,port-string ,path)]
+   (try
+     (let ((port (list_to_integer port-string))
+           (name (++ "ws" port-string)))
+       (serve name port path))
+     (catch
+       ((tuple _ _ _) (usage)))))
+  (['()] (main '["8000" "."]))
+  ([_]   (usage)))
+#+END_SRC
+
+** ~usage/0~
+~usage/0~ simply prints a brief summary of how to use =ws.lfe=, i.e. pass
+a port (e.g. =8000=) as the first argument and a path (e.g. =.=) as the second.
+#+NAME: usage/0
+#+BEGIN_SRC lfe
+(defun usage () (io:fwrite "Usage: ws.lfe <port:8000> <path:.>\n"))
+#+END_SRC
+
+** ~serve/3~
+The actual serving is handled by ~serve/3~. Given a (server) ~name~, ~port~ (on
+which to listen) and (file) ~path~ (to serve), start an ~httpd~ service,
+configured as follows:
+
+*** inets httpd config
+#+NAME: httpd-config
+| Option            | Value                        | Description                                                                    |
+|-------------------+------------------------------+--------------------------------------------------------------------------------|
+| ~port~            | ~port~                       | The port on which to listen.                                                   |
+| ~server_name~     | ~name~                       | The name of the server, ~​"ws{{port}}"​~                                         |
+| ~server_root~     | ~path~                       | The home directory of the server.                                              |
+| ~document_root~   | ~path~                       | The top directory for available documents.                                     |
+| ~directory_index~ | ~["index.html" "index.htm"]~ | A list of resources to look for if a client requests a directory.              |
+| ~mime_types~      | See below.                   | A mapping from file extension to MIME type, used to MIME type before delivery. |
+
+*** MIME types config
+#+NAME: mime-types
+| Extension | MIME Type                  |
+|-----------+----------------------------|
+| "html"    | "text/html"                |
+| "htm"     | "text/html"                |
+| "css"     | "text/css"                 |
+| "js"      | "application/x-javascript" |
+| "svg"     | "image/svg+xml"            |
+| "png"     | "image/png"                |
+| "gif"     | "image/gif"                |
+| "jpg"     | "image/jpeg"               |
+| "jpeg"    | "image/jpeg"               |
+
+
+Call ~inets:start/2~ with the atom, ~httpd~, as the first argument and the
+configuration above (as property list) as the second. Finally, print information
+regarding the ~port~, ~path~ and support MIME types.
+#+NAME: serve/3
+#+BEGIN_SRC lfe
+(defun serve (name port path)
+  (inets:start)
+  (let* [(mime-types '[#("html" "text/html")
+                       #("htm"  "text/html")
+                       #("css"  "text/css")
+                       #("js"   "application/x-javascript")
+                       #("svg"  "image/svg+xml")
+                       #("png"  "image/png")
+                       #("gif"  "image/gif")
+                       #("jpg"  "image/jpeg")
+                       #("jpeg" "image/jpeg")])
+         (`#(ok ,pid) (inets:start
+                       'httpd
+                       `[#(port            ,port)
+                         #(server_name     ,name)
+                         #(server_root     ,path)
+                         #(document_root   ,path)
+                         #(directory_index ["index.html" "index.htm"])
+                         #(mime_types      ,mime-types)]))]
+    (lfe_io:format "Started listening on http://0.0.0.0:~p serving ~p\n" `(,port ,path))
+    (lfe_io:format "Supported MIME types:\n~p\n" `(,mime-types))
+    (receive
+      ((tuple _ _)
+       'ok))))
+#+END_SRC
